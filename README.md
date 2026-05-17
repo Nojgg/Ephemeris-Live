@@ -1,5 +1,7 @@
 # Ephemeris Live
 
+![Dashboard Preview](https://cdn.discordapp.com/attachments/1416155869686661234/1505585440281989230/icon.png?ex=6a0b2935&is=6a09d7b5&hm=606c12e58ffa1f0025441f1169a52b77770f034c8cd455aa5e3face3c7a1251d&) 
+
 A lightweight, real-time astronomical tracking dashboard built using the LÖVE framework (Lua). It’s designed to act as a responsive "mission control" station for amateur astronomers, visual observers, or anyone using a manual setup like the Hadley 3D-printed telescope.
 
 Instead of heavy background assets or massive local databases, the app queries the **NASA/JPL Horizons API** asynchronously over lightweight HTTP threads to get mathematically precise coordinate trends, tracking profiles, and visual data for targets in our solar system.
