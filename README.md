@@ -33,10 +33,3 @@ Instead of heavy background assets or massive local databases, the app queries t
 ## Running Locally
 
 To run the project, you simply need to install the exe file in the release page 
-
-### Cloned Repository Execution
-1. Clone this repository down to your machine:
-   ```bash
-   git clone [https://github.com/Nojgg/Ephemeris-Live.git](https://github.com/Nojgg/Ephemeris-Live.git)
-   cd ephemeris-live
-   ```
