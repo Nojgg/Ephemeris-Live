@@ -33,3 +33,5 @@ Instead of heavy background assets or massive local databases, the app queries t
 ## Running Locally
 
 To run the project, you simply need to install the exe file in the release page 
+
+https://github.com/Nojgg/Ephemeris-Live/releases/
