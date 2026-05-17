@@ -13,6 +13,9 @@ local selected_planet = "Jupiter"
 local night_mode = false
 local loc_status = "Locating..."
 
+-- Core loading screen state flag tracking variable
+local is_initializing = true
+
 local scroll_y = 0
 local max_scroll = 0
 
@@ -67,6 +70,10 @@ end
 process_next_in_queue = function()
     if #queue == 0 then 
         is_fetching = false 
+        -- Once the background worker queue drops to zero on boot, the app is fully initialized
+        if is_initializing then
+            is_initializing = false
+        end
         return 
     end
     local planet = table.remove(queue, 1)
@@ -115,7 +122,7 @@ local function geocode_address()
 end
 
 function love.load()
-local iconData = love.image.newImageData("icon.png")
+    local iconData = love.image.newImageData("icon.png")
     love.window.setIcon(iconData)
 
     love.window.setTitle("Ephemeris Live")
@@ -180,6 +187,9 @@ function love.update(dt)
         end
     end
 
+    -- If we are still processing the boot synchronization sequences, keep inputs locked out safely
+    if is_initializing then return end
+
     local trigger_refresh = false
     
     if love.keyboard.isDown("right") then
@@ -229,6 +239,7 @@ function love.mousemoved(x, y, dx, dy)
 end
 
 function love.wheelmoved(x, y)
+    if is_initializing then return end
     idle_time = 0
     is_dimmed = false
     local w, h = love.graphics.getDimensions()
@@ -263,7 +274,51 @@ end
 
 function love.draw()
     local w, h = love.graphics.getDimensions()
-    
+
+    -- --- TRUE INTERACTIVE TELEMETRY LOADING SCREEN MASK OVERLAY ---
+    if is_initializing then
+        love.graphics.clear(0.01, 0.01, 0.03)
+        love.graphics.push("all")
+        
+        -- Keeps color formatting matching tactical night configuration constraints seamlessly
+        set_color(0.92, 0.72, 0.22, 1)
+        love.graphics.setFont(font_bold)
+        love.graphics.printf("EPHEMERIS LIVE", 0, h / 2 - 80, w, "center")
+        
+        set_color(0.4, 0.4, 0.6, 1)
+        love.graphics.setFont(font_small)
+        love.graphics.printf("INITIALIZING MISSION CONTROL DECK MODULES...", 0, h / 2 - 45, w, "center")
+        
+        -- Dynamic loading progress bar rendering parameters
+        local bar_w = 320
+        local bar_h = 6
+        local bar_x = (w - bar_w) / 2
+        local bar_y = h / 2 - 20
+        
+        set_color(0.1, 0.1, 0.2, 1)
+        love.graphics.rectangle("fill", bar_x, bar_y, bar_w, bar_h, 3)
+        
+        -- Compute true incremental tracking metrics to drive loading fill widths smoothly
+        local total_targets = #Backend.planets
+        local pending_count = #queue
+        local completed_targets = total_targets - pending_count
+        local progress_pct = total_targets > 0 and (completed_targets / total_targets) or 0
+        
+        set_color(0.92, 0.72, 0.22, 1)
+        love.graphics.rectangle("fill", bar_x, bar_y, bar_w * progress_pct, bar_h, 3)
+        
+        -- Subtext status tracker displaying network queue feedback strings
+        set_color(0.5, 0.5, 0.6, 0.8)
+        love.graphics.setFont(font_tiny)
+        local status_msg = string.format("Synchronizing Ephemeris Database Profile: %d / %d Parameters Resolved", completed_targets, total_targets)
+        love.graphics.printf(status_msg, 0, bar_y + 18, w, "center")
+        love.graphics.printf("Observer Site Metadata: " .. loc_status, 0, bar_y + 36, w, "center")
+        
+        love.graphics.pop()
+        return
+    end
+
+    -- --- STANDALONE MAIN INSTRUMENT DESK INTERFACE WORKSPACE (UNLOCKED POST-LOAD) ---
     local list_w = math.max(240, math.floor(w * 0.25))
     local bottom_h = math.max(150, math.floor(h * 0.22))
     local header_h = 70 
@@ -376,7 +431,6 @@ function love.draw()
         set_color(0.6, 0.6, 0.8, 1)
         love.graphics.print("Resulting Mag: " .. string.format("%.1fx", calculated_mag), 20, start_y + 150)
         
-        -- Custom Geolocation Interface Configurator Section
         set_color(1, 1, 1, 1)
         love.graphics.setFont(font_bold)
         love.graphics.print("Observation Coordinates", 20, start_y + 185)
@@ -700,6 +754,7 @@ function love.keypressed(k)
 end
 
 function love.mousepressed(x, y, button)
+    if is_initializing then return end
     idle_time = 0
     is_dimmed = false
     
