@@ -37,4 +37,4 @@ To run the project, you simply need to install the exe file in the release page
 https://github.com/Nojgg/Ephemeris-Live/releases/
 
 
-# ⚠️ This App is a prototype for a Push-TO project for manual telescopes. ⚠️
+# ⚠️ This App is a prototype for a Push-TO project for manual telescopes (in my case, the Haddley 3D PRINTED Telescope). ⚠️
