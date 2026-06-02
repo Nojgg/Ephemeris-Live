@@ -3,5 +3,5 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="Ephemeris_Live/Ephemeris_Live.vcxproj" />
+  <Project Path="Ephemeris_Live/Ephemeris_Live.vcxproj" Id="9ac39ce6-9040-4e63-bf2b-953ef1a7cb43" />
 </Solution>
