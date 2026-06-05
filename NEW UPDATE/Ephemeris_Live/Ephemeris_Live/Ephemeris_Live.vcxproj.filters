@@ -48,5 +48,12 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+    <None Include="index.html">
+      <Filter>Fichiers de ressources</Filter>
+    </None>
+    <None Include="style.css">
+      <Filter>Fichiers de ressources</Filter>
+    </None>
+    <None Include="starfield.js" />
   </ItemGroup>
 </Project>

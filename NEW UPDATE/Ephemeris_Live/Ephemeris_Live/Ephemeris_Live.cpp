@@ -3,8 +3,8 @@
 		 Add error handling and edge cases
 		 Optimize performance if necessary
 		 Test with various celestial objects and time inputs*/
+
 #define _CRT_SECURE_NO_WARNINGS
-#include "raylib.h"
 #include <iostream>
 #include <string>
 #include <vector>
@@ -15,9 +15,16 @@
 #include <memory>
 #include <ctime>
 
-		 // --- Configuration des paramètres ---
+		 // --- Bibliothèques réseau indispensables pour Windows ---
+#pragma comment(lib, "ws2_32.lib")
+#pragma comment(lib, "crypt32.lib")
+
+#include "httplib.h" // Inclure httplib.h (que tu as déjà)
+
+// --- Configuration des paramètres ---
 float LATITUDE = 46.2276f;
 float LONGITUDE = 2.2137f;
+const float PI = 3.14159265358979323846f; // Redéfinition de PI car Raylib a été retiré
 const std::string CENTER = "coord@399";
 const std::string STEP_SIZE = "1 m";
 
@@ -25,15 +32,15 @@ struct PlanetData {
 	std::string name;
 	std::string id;
 	std::string type;
-	Color color;
 };
 
+// Plus besoin des couleurs ici, le Web (CSS/JS) s'en chargera !
 std::vector<PlanetData> planets = {
-	{"Sun", "10", "star", YELLOW}, {"Mercury", "199", "planet", GRAY},
-	{"Venus", "299", "planet", ORANGE}, {"Mars", "499", "planet", RED},
-	{"Jupiter", "599", "planet", ORANGE}, {"Saturn", "699", "planet", GOLD},
-	{"Uranus", "799", "planet", SKYBLUE}, {"Neptune", "899", "planet", BLUE},
-	{"Pluto", "999", "planet", PURPLE}, {"Moon", "301", "satellite", LIGHTGRAY}
+	{"Sun", "10", "star"}, {"Mercury", "199", "planet"},
+	{"Venus", "299", "planet"}, {"Mars", "499", "planet"},
+	{"Jupiter", "599", "planet"}, {"Saturn", "699", "planet"},
+	{"Uranus", "799", "planet"}, {"Neptune", "899", "planet"},
+	{"Pluto", "999", "planet"}, {"Moon", "301", "satellite"}
 };
 
 // --- Mathématiques et conversions ---
@@ -64,17 +71,13 @@ float AltAzConverter(float raDeg, float decDeg, float timeUTC) {
 	float lst = degToRad(lst_deg(timeUTC));
 	float ha = lst - ra;
 
-	// Optimisation : Conversion de la latitude en radians et mise en cache
 	float latRad = degToRad(LATITUDE);
 	float sinLat = sin(latRad);
 	float cosLat = cos(latRad);
 	float sinDec = sin(dec);
 	float cosDec = cos(dec);
 
-	// Correction de la formule : Il y avait un cos(LATITUDE) en trop
 	float sin_Alt = sinDec * sinLat + cosDec * cosLat * cos(ha);
-
-	// Sécurité mathématique (Clamping) pour éviter les erreurs NaN
 	sin_Alt = fmaxf(-1.0f, fminf(1.0f, sin_Alt));
 	float alt = asin(sin_Alt);
 
@@ -87,9 +90,8 @@ float AltAzConverter(float raDeg, float decDeg, float timeUTC) {
 
 float RiseTransitSet(float ra_deg, float dec_deg, float dateUTC) {
 	float dec = degToRad(dec_deg);
-	float latRad = degToRad(LATITUDE); // Optimisation : Radian
+	float latRad = degToRad(LATITUDE);
 
-	// Optimisation : Retrait du sin(0.0f) inutile et correction trigonométrique
 	float cosH = -(sin(latRad) * sin(dec)) / (cos(latRad) * cos(dec));
 
 	if (cosH < -1.0f) { return INFINITY; }
@@ -100,7 +102,6 @@ float RiseTransitSet(float ra_deg, float dec_deg, float dateUTC) {
 	float H = acos(cosH);
 
 	float tr = dateUTC + (ra - lst) / (2.0f * PI) * 86400.0f;
-
 	return static_cast<float>(time(nullptr));
 }
 
@@ -161,10 +162,7 @@ bool parse_horizons(const std::string& text, double& out_ra, double& out_dec, do
 			std::vector<std::string> tokens;
 			std::string token;
 			std::istringstream linestream(line);
-
-			// Optimisation : On réserve de l'espace pour éviter de ralentir la mémoire
 			tokens.reserve(15);
-
 			while (linestream >> token) {
 				tokens.push_back(token);
 			}
@@ -198,28 +196,54 @@ std::string generate_json(const PlanetData& planet, double alt, double az, const
 
 // --- Point d'Entrée Principal ---
 
-#include "httplib.h" // Inclure httplib.h (que tu as déjà)
-
 int main() {
 	httplib::Server svr;
 
 	// Cette route permet au Web de demander des données
-	svr.Get("/api", [](const httplib::Request& req, httplib::Response& res) {
-		std::string planetName = req.get_param_value("planet");
+	svr.Get("/api", [&](const httplib::Request& req, httplib::Response& res) {
+		std::string pName = req.get_param_value("planet");
 
-		// --- Ici, tu appelles tes fonctions de calcul ---
-		// Ex: alt = AltAzConverter(...);
+		// 1. Trouver l'ID et les données de la planète
+		PlanetData currentPlanet = planets[0]; // Soleil par défaut
+		for (const auto& p : planets) {
+			if (p.name == pName) {
+				currentPlanet = p;
+				break;
+			}
+		}
 
-		// On génère ton JSON (en supposant que tu as tes valeurs)
-		std::string json_result = "{\"planet\":\"" + planetName + "\", \"alt\": 45.2, \"az\": 180, \"visible\": true}";
+		// 2. Préparer les dates (UTC)
+		time_t now = std::time(nullptr);
+		struct tm* gmt = std::gmtime(&now);
+		char start[30], stop[30];
+		std::strftime(start, sizeof(start), "%Y-%m-%d %H:%M:%S", gmt);
+		time_t end = now + 60;
+		struct tm* gmt_end = std::gmtime(&end);
+		std::strftime(stop, sizeof(stop), "%Y-%m-%d %H:%M:%S", gmt_end);
 
-		// On envoie la réponse au navigateur
-		res.set_content(json_result, "application/json");
-		// IMPORTANT : Permettre la communication entre ton HTML et ton C++
+		// 3. Récupérer et parser les données NASA
+		std::string url = build_url(currentPlanet.id, start, stop);
+		std::string rawData = exec(("curl -s -L \"" + url + "\"").c_str());
+
+		double ra, dec, ang;
+		if (parse_horizons(rawData, ra, dec, ang)) {
+			float alt = AltAzConverter((float)ra, (float)dec, (float)now);
+
+			// 4. Construire le vrai JSON en passant la bonne planète
+			std::string json = generate_json(currentPlanet, alt, 0.0, "S", "00:00", "12:00", "23:59", alt > 0, ang);
+			res.set_content(json, "application/json");
+		}
+		else {
+			res.set_content("{\"error\":\"NASA data failed\"}", "application/json");
+		}
+
 		res.set_header("Access-Control-Allow-Origin", "*");
 		});
 
-	std::cout << "Serveur lance sur http://localhost:8080" << std::endl;
+	std::cout << "--- EPHEMERIS BACKEND ---" << std::endl;
+	std::cout << "Serveur lance et en ecoute sur http://localhost:8080" << std::endl;
+	std::cout << "Ne fermez pas cette fenetre noire." << std::endl;
+
 	svr.listen("0.0.0.0", 8080);
 	return 0;
 }

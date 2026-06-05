@@ -155,7 +155,10 @@
     <Image Include="small.ico" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="index.html" />
     <None Include="packages.config" />
+    <None Include="starfield.js" />
+    <None Include="style.css" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
