@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Ephemeris Dashboard</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #f8fafc;
+            --accent: #38bdf8;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: system-ui, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: var(--card);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #334155;
+        }
+
+        canvas {
+            background: #000;
+            width: 100%;
+            height: 400px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+
+        .planet-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #334155;
+        }
+
+        #status-bar {
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .error {
+            background: #7f1d1d;
+            color: #fecaca;
+        }
+
+        .online {
+            background: #064e3b;
+            color: #a7f3d0;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="status-bar">Connecting to server...</div>
+
+    <div class="dashboard">
+        <div class="card">
+            <h3>Planets</h3>
+            <div id="planet-list"></div>
+        </div>
+        <div class="card">
+            <h3>Sky View</h3>
+            <canvas id="skyCanvas" width="800" height="400"></canvas>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('skyCanvas');
+        const ctx = canvas.getContext('2d');
+        const planetList = document.getElementById('planet-list');
+        const statusBar = document.getElementById('status-bar');
+        const API = "http://localhost:8080/api";
+        const PLANETS = ["Sun", "Moon", "Mars", "Jupiter", "Venus", "Saturn", "Mercury"];
+
+        async function refreshData() {
+            try {
+                // Fetch all data
+                const promises = PLANETS.map(p => fetch(`${API}?planet=${p}`).then(r => r.json()));
+                const results = await Promise.all(promises);
+
+                // If successful, update status
+                statusBar.innerText = "System Online";
+                statusBar.className = "online";
+
+                // Clear & Redraw
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                planetList.innerHTML = "";
+
+                results.forEach(data => {
+                    // Update List
+                    const div = document.createElement('div');
+                    div.className = "planet-item";
+                    div.innerHTML = `<span>${data.planet}</span> <span>${data.alt > 0 ? "Visible" : "Hidden"}</span>`;
+                    planetList.appendChild(div);
+
+                    // Update Canvas
+                    if (data.alt > 0) {
+                        const x = (data.az / 360) * canvas.width;
+                        const y = canvas.height - (data.alt / 90) * canvas.height;
+                        ctx.fillStyle = "#38bdf8";
+                        ctx.beginPath();
+                        ctx.arc(x, y, 5, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillText(data.planet, x + 10, y);
+                    }
+                });
+            } catch (err) {
+                statusBar.className = "error";
+                statusBar.innerText = "CONNECTION ERROR: Is the C++ server running on port 8080?";
+                console.error("Critical Failure:", err);
+            }
+        }
+
+        // Run immediately, then loop
+        refreshData();
+        setInterval(refreshData, 5000);
+    </script>
+</body>
+</html>

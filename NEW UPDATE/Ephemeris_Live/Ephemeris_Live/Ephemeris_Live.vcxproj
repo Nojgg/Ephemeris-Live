@@ -157,8 +157,12 @@
   <ItemGroup>
     <None Include="index.html" />
     <None Include="packages.config" />
+    <None Include="PrivacyPolicy.html" />
     <None Include="starfield.js" />
     <None Include="style.css" />
+    <None Include="style2.css" />
+    <None Include="Sutarfield.js" />
+    <None Include="WebSky.html" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

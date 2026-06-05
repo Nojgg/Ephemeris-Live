@@ -55,5 +55,13 @@
       <Filter>Fichiers de ressources</Filter>
     </None>
     <None Include="starfield.js" />
+    <None Include="PrivacyPolicy.html">
+      <Filter>Fichiers de ressources</Filter>
+    </None>
+    <None Include="style2.css" />
+    <None Include="WebSky.html">
+      <Filter>Fichiers de ressources</Filter>
+    </None>
+    <None Include="Sutarfield.js" />
   </ItemGroup>
 </Project>
