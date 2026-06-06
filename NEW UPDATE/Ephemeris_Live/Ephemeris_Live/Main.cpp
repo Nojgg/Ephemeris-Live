@@ -1,8 +1,10 @@
-// Zoom/Pan support can be added here
+
+
 #define _CRT_SECURE_NO_WARNINGS
 #include "raylib.h"
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
+
 
 #include <iostream>
 #include <string>
@@ -17,6 +19,7 @@
 #include <fstream>
 #include <atomic>
 #include <chrono>
+
 
 // --- Constants ---
 const float MY_PI = 3.14159265358979323846f;
@@ -281,6 +284,7 @@ void ApplyStyle() {
 
 // --- Main Application ---
 int main() {
+
     InitWindow(1200, 800, "Ephemeris Live 3.0");
     SetTargetFPS(60);
 	SetWindowIcon(LoadImage("favicon.png"));

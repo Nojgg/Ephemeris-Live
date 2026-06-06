@@ -37,15 +37,13 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="Ephemeris_Live.rc">
-      <Filter>Fichiers de ressources</Filter>
-    </ResourceCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <Image Include="small.ico">
+    <Image Include="Ephemeris_Live.ico">
       <Filter>Fichiers de ressources</Filter>
     </Image>
-    <Image Include="Ephemeris_Live.ico">
+    <Image Include="favicon.ico">
+      <Filter>Fichiers de ressources</Filter>
+    </Image>
+    <Image Include="favicon.png">
       <Filter>Fichiers de ressources</Filter>
     </Image>
   </ItemGroup>
@@ -69,5 +67,10 @@
     <None Include="vcpkg.json">
       <Filter>Fichiers de ressources</Filter>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Ephemeris_Live.rc">
+      <Filter>Fichiers de ressources</Filter>
+    </ResourceCompile>
   </ItemGroup>
 </Project>
