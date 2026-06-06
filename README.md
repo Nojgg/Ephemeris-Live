@@ -6,6 +6,8 @@ A lightweight, real-time astronomical tracking dashboard built using the LÖVE f
 
 Instead of heavy background assets or massive local databases, the app queries the **NASA/JPL Horizons API** asynchronously over lightweight HTTP threads to get mathematically precise coordinate trends, tracking profiles, and visual data for targets in our solar system.
 
+https://ephemeris-live.netlify.app/
+
 ![Dashboard Preview](https://cdn.discordapp.com/attachments/1416155869686661234/1505567083667132527/image.png?ex=6a0b181c&is=6a09c69c&hm=2310635e6e56564d0069b748b390d72033eeea1bca7d187b2d8ddf78658b78d2&) 
 
 ---
