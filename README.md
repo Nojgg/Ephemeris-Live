@@ -1,40 +1,51 @@
 # Ephemeris Live
 
-<img src="https://cdn.discordapp.com/attachments/1416155869686661234/1505585440281989230/icon.png?ex=6a0b2935&is=6a09d7b5&hm=606c12e58ffa1f0025441f1169a52b77770f034c8cd455aa5e3face3c7a1251d&" alt="Icon" width="400" height="400">   
+<img src="https://cdn.discordapp.com/attachments/1416155869686661234/1505585440281989230/icon.png" alt="Icon" width="400" height="400"> 
 
-A lightweight, real-time astronomical tracking dashboard built using the LÖVE framework (Lua). It’s designed to act as a responsive "mission control" station for amateur astronomers, visual observers, or anyone using a manual setup like the Hadley 3D-printed telescope.
+A lightweight, real-time astronomical tracking dashboard. Designed as a responsive "mission control" station for amateur astronomers, visual observers, and DIY telescope builders (specifically optimized for the Hadley 3D-printed telescope).
 
-Instead of heavy background assets or massive local databases, the app queries the **NASA/JPL Horizons API** asynchronously over lightweight HTTP threads to get mathematically precise coordinate trends, tracking profiles, and visual data for targets in our solar system.
+**Now powered by Native C++ and Raylib.**
 
-![Dashboard Preview](https://cdn.discordapp.com/attachments/1416155869686661234/1505567083667132527/image.png?ex=6a0b181c&is=6a09c69c&hm=2310635e6e56564d0069b748b390d72033eeea1bca7d187b2d8ddf78658b78d2&) 
+Ephemeris Live has been completely rebuilt from the ground up to provide a high-performance experience. By migrating from the LÖVE (Lua) framework to a native C++ implementation, we have achieved lower CPU overhead, better memory management, and a more stable, responsive interface.
 
----
-
-## Features
-
-* **Asynchronous NASA/JPL Data Fetching:** Spawns dedicated background threads to fetch real-time celestial data from the Horizons database without stalling or causing frame drops in the main rendering thread.
-* **Auto-Location Detection:** Uses a fast, non-blocking IP lookup to grab your approximate latitude and longitude on startup so your local Alt/Az coordinates, rise times, and transit schedules are accurate immediately.
-* **Custom Locations:** Enter your own adress in the spec tab.
-* **Live Planisphere Radar View:** Computes and translates raw celestial coordinates into an intuitive top-down local sky map projection.
-* **Simulated Newtonian Eyepiece Reticle:** Features a custom stencil-masked eyepiece simulator. It scales magnification based on your current scope and eyepiece focal lengths, simulating inverted optics and moon/planet configurations.
-* **Tactical Night Mode:** Toggles a red-scale color profile across all drawing matrices to preserve your eyes' dark adaptation when using a laptop or screen out in the field.
+https://ephemeris-live.netlify.app/
 
 ---
 
-## Keyboard Controls & Shortcuts
-
-* **`N`** - Toggle Red-scale filter
-* **`R`** - Reset time offset back to current real-world UTC time
-* **`Left Arrow` / `Right Arrow`** - Shift time tracking backwards or forwards by 1 hour increments to predict upcoming transits
-* **`+` / `-`** - Increase or decrease the simulated eyepiece focal length to test out different magnifications fluidly
+## 🚀 What's New in the C++ Version
+* **Native Performance:** Fully rewritten in C++ using the **Raylib** library for smooth, hardware-accelerated rendering.
+* **Modern GUI System:** Utilizing `raygui-cpp` for a clean, modular, and responsive interface.
+* **Optimized Data Pipeline:** Native data handling with `nlohmann/json` for lightning-fast parsing of telemetry from the **NASA/JPL Horizons API**.
+* **Threaded Architecture:** Asynchronous data fetching ensures the UI remains buttery smooth while fetching celestial updates.
 
 ---
 
-## Running Locally
+## Core Features
+* **Asynchronous NASA/JPL Data Fetching:** Dedicated background threads fetch real-time celestial data without frame drops.
+* **Custom Locations:** Enter your address in the specs tab for precision local tracking.
+* **Live Planisphere Radar:** Real-time computation of celestial coordinates into an intuitive top-down sky map projection.
+* **Tactical Night Mode:** One-click red-scale filter to preserve your dark adaptation.
 
-To run the project, you simply need to install the exe file in the release page 
+---
 
-https://github.com/Nojgg/Ephemeris-Live/releases/
+## Building from Source
 
+This is a native C++ project (C++17/20).
 
-# ⚠️ This App is a prototype for a Push-TO project for manual telescopes (in my case, the Haddley 3D PRINTED Telescope). ⚠️
+1. **Requirements:** - Visual Studio 2022+ (for Windows)
+   - `vcpkg` (for dependency management)
+2. **Setup:**
+   - Clone the repository.
+   - The project uses `vcpkg` to manage `raylib` and `nlohmann-json`.
+3. **Compilation:**
+   - Open the `/Ephemeris_Live.slnx` (or `.vcxproj`) file in Visual Studio.
+   - Build the solution.
+
+---
+
+## ⚠️ Prototype Disclaimer ⚠️
+This app is a prototype for a **Push-TO project** for manual telescopes (specifically the Hadley 3D-Printed Telescope). As a native C++ application, it is under active development. Expect improvements to tracking precision and UI fluidity in upcoming commits.
+
+---
+
+*Contributions, bug reports, and telescope-specific feature requests are highly encouraged!*
