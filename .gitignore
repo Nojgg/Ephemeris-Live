@@ -1,1 +1,47 @@
 /luasec
+# Fichiers spécifiques à Visual Studio (IDE)
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.dbmdl
+
+# Dossiers de compilation (Build)
+Debug/
+Release/
+x64/
+x86/
+[Bb]in/
+[Oo]bj/
+out/
+
+# Fichiers objets et temporaires de compilation
+*.obj
+*.ilk
+*.meta
+*.pch
+*.pdb
+*.idb
+*.iobj
+*.ipdb
+
+# Fichiers exécutables et bibliothèques
+*.exe
+*.dll
+*.lib
+*.exp
+*.app
+
+# Fichiers de log et de cache
+*.log
+*.tlog
+*.cache
+
+# Fichiers générés par CMake (si tu l'utilises un jour)
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Makefile
+cmake_install.cmake
+install_manifest.txt
