@@ -17,7 +17,7 @@ https://ephemeris-live.netlify.app/
 
 ## What's New in the C++ Version
 * **Native Performance:** Fully rewritten in C++ using the **Raylib** library for smooth, hardware-accelerated rendering.
-* **Modern GUI System:** Utilizing `raygui-cpp` for a clean, modular, and responsive interface.
+* **GUI System:** Utilizing `raygui-cpp` for a clean, modular, and responsive interface.
 * **Optimized Data Pipeline:** Native data handling with `nlohmann/json` for lightning-fast parsing of telemetry from the **NASA/JPL Horizons API**.
 * **Threaded Architecture:** Asynchronous data fetching ensures the UI remains buttery smooth while fetching celestial updates.
 
