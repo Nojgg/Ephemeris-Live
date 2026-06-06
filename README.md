@@ -10,9 +10,12 @@ Ephemeris Live has been completely rebuilt from the ground up to provide a high-
 
 https://ephemeris-live.netlify.app/
 
+### App Preview :
+<img src="https://cdn.discordapp.com/attachments/1416155869686661234/1512953723461046363/image.png?ex=6a25f774&is=6a24a5f4&hm=3666f33d554feb53dc6539bb2c47f3fe4db22e21370eddfbe1edd249837f0a67&" alt="App Preview" witdh="25">
+
 ---
 
-## 🚀 What's New in the C++ Version
+## What's New in the C++ Version
 * **Native Performance:** Fully rewritten in C++ using the **Raylib** library for smooth, hardware-accelerated rendering.
 * **Modern GUI System:** Utilizing `raygui-cpp` for a clean, modular, and responsive interface.
 * **Optimized Data Pipeline:** Native data handling with `nlohmann/json` for lightning-fast parsing of telemetry from the **NASA/JPL Horizons API**.
