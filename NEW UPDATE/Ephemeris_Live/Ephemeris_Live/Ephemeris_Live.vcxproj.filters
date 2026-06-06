@@ -27,9 +27,12 @@
     <ClInclude Include="Ephemeris_Live.h">
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>
+    <ClInclude Include="raygui-cpp-main\include\raygui-cpp.h">
+      <Filter>Fichiers d%27en-tête</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Ephemeris_Live.cpp">
+    <ClCompile Include="Main.cpp">
       <Filter>Fichiers sources</Filter>
     </ClCompile>
   </ItemGroup>
@@ -63,5 +66,8 @@
       <Filter>Fichiers de ressources</Filter>
     </None>
     <None Include="Sutarfield.js" />
+    <None Include="vcpkg.json">
+      <Filter>Fichiers de ressources</Filter>
+    </None>
   </ItemGroup>
 </Project>

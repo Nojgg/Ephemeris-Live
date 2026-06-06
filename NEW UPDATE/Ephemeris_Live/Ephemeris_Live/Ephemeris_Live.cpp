@@ -129,7 +129,7 @@ bool parse_horizons(const std::string& text, double& ra, double& dec, double& an
     return false;
 }
 
-int main() {
+int StartBackend() {
     httplib::Server svr;
 
     svr.set_default_headers({ {"Access-Control-Allow-Origin", "*"} });
