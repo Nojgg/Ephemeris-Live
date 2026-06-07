@@ -1,10 +1,7 @@
-
-
 #define _CRT_SECURE_NO_WARNINGS
 #include "raylib.h"
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
-
 
 #include <iostream>
 #include <string>
@@ -19,7 +16,6 @@
 #include <fstream>
 #include <atomic>
 #include <chrono>
-
 
 // --- Constants ---
 const float MY_PI = 3.14159265358979323846f;
@@ -44,6 +40,8 @@ struct Planet {
 // Application State
 struct AppState {
     int current_tab = 0;
+    float mapZoom = 1.0f;
+    Vector2 mapPan = { 0,0 };
 
     // Global Location
     float latitude = 46.2276f;
@@ -55,12 +53,14 @@ struct AppState {
     char addressBuf[128] = "";
     char telBuf[32] = "1000.0";
     char eyeBuf[32] = "25.0";
+    char afovBuf[32] = "50.0";
+
     char journalTitle[128] = "Observation Session 01";
     char journalTarget[64] = "Jupiter";
-    char journalBuffer[4096] = "Seeing conditions:\nTransparency:\n\nNotes:\n";
+    char journalBuffer[4096] = "Conditions d'observation :\nTransparence :\n\nNotes :\n";
 
     bool editLat = false, editLon = false, editAddress = false;
-    bool editTel = false, editEye = false;
+    bool editTel = false, editEye = false, editAfov = false;
     bool editTitle = false, editTarget = false, editJournal = false;
 
     long long timeOffsetSeconds = 0;
@@ -87,7 +87,7 @@ std::mutex dataMutex;
 // --- Utility Functions ---
 std::string urlencode(const std::string& str) {
     std::ostringstream escaped;
-    escaped << std::hex << std::uppercase << std::setfill('0'); // FIXED: setfill ensures proper %09 vs %9
+    escaped << std::hex << std::uppercase << std::setfill('0');
     for (char c : str) {
         if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') escaped << c;
         else escaped << '%' << std::setw(2) << int((unsigned char)c);
@@ -95,7 +95,6 @@ std::string urlencode(const std::string& str) {
     return escaped.str();
 }
 
-// FIXED: Now properly injects your actual Latitude and Longitude into the API call
 std::string build_url(const std::string& command, const std::string& start, const std::string& stop, float lat, float lon) {
     std::string site = std::to_string(lon) + "," + std::to_string(lat) + ",0";
     return "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND='" + urlencode(command) +
@@ -163,7 +162,7 @@ bool parse_horizons(const std::string& text, double& ra, double& dec, double& an
     return false;
 }
 
-// --- Geocoding (Address to Lat/Lon) ---
+// --- Geocoding ---
 void GeocodeAddress(const std::string& address) {
     std::cout << "Geocoding Address: " << address << "...\n";
     std::string url = "https://nominatim.openstreetmap.org/search?q=" + urlencode(address) + "&format=json&limit=1";
@@ -191,9 +190,6 @@ void GeocodeAddress(const std::string& address) {
         }
         catch (...) {}
     }
-    else {
-        std::cout << "Geocode Failed! Please check your spelling or internet connection.\n";
-    }
 }
 
 // --- Background Data Fetcher Thread ---
@@ -203,9 +199,7 @@ void BackendThreadFunc() {
             state.forceRefresh = false;
             state.isFetching = true;
 
-            // Start loading screen timer
             auto fetchStart = std::chrono::steady_clock::now();
-
             time_t targetTime = std::time(nullptr) + state.timeOffsetSeconds;
             char start[30], stop[30];
             std::strftime(start, sizeof(start), "%Y-%m-%d %H:%M:%S", std::gmtime(&targetTime));
@@ -225,14 +219,8 @@ void BackendThreadFunc() {
                     p.ang_size = ang;
                     p.dataLoaded = true;
                 }
-                else {
-                    std::cout << "\n--- NASA API ERROR: Failed to fetch " << p.name << " ---\n";
-                    std::cout << "URL Sent: " << url << "\n";
-                    std::cout << "API Replied: " << rawData << "\n-------------------\n";
-                }
             }
 
-            // Ensure the loading screen is visible for at least 800ms so it doesn't flash violently
             auto fetchEnd = std::chrono::steady_clock::now();
             long long duration = std::chrono::duration_cast<std::chrono::milliseconds>(fetchEnd - fetchStart).count();
             if (duration < 800) std::this_thread::sleep_for(std::chrono::milliseconds(800 - duration));
@@ -246,12 +234,13 @@ void BackendThreadFunc() {
 // --- File I/O Helpers ---
 void SaveSpecs() {
     std::ofstream file("specs.txt");
-    if (file.is_open()) file << state.telBuf << "\n" << state.eyeBuf << "\n" << state.latBuf << "\n" << state.lonBuf;
+    if (file.is_open()) file << state.telBuf << "\n" << state.eyeBuf << "\n" << state.latBuf << "\n" << state.lonBuf << "\n" << state.afovBuf;
 }
 void LoadSpecs() {
     std::ifstream file("specs.txt");
     if (file.is_open()) {
         file >> state.telBuf >> state.eyeBuf >> state.latBuf >> state.lonBuf;
+        if (!(file >> state.afovBuf)) strcpy(state.afovBuf, "50.0");
         try {
             if (state.latBuf[0] != '\0') state.latitude = std::stof(state.latBuf);
             if (state.lonBuf[0] != '\0') state.longitude = std::stof(state.lonBuf);
@@ -273,7 +262,6 @@ void ExportJournal() {
     }
 }
 
-// --- GUI Helper ---
 void ApplyStyle() {
     GuiSetStyle(DEFAULT, BACKGROUND_COLOR, 0x1E1E1EFF);
     GuiSetStyle(DEFAULT, TEXT_COLOR_NORMAL, 0xFFFFFFFF);
@@ -282,12 +270,9 @@ void ApplyStyle() {
     GuiSetStyle(BUTTON, BASE_COLOR_NORMAL, 0x303030FF);
 }
 
-// --- Main Application ---
 int main() {
-
     InitWindow(1200, 800, "Ephemeris Live 3.0");
     SetTargetFPS(60);
-	SetWindowIcon(LoadImage("favicon.png"));
     ApplyStyle();
     LoadSpecs();
 
@@ -306,18 +291,30 @@ int main() {
         Rectangle content = { 340, 20, 840, 760 };
 
         if (state.current_tab == 0) { // PLANETARIUM
-            DrawRectangleRec({ 375, 20, 740, 500 }, { 20, 20, 20, 255 });
+            Rectangle mapArea = { 375,20,740,500 };
+            if (CheckCollisionPointRec(GetMousePosition(), mapArea)) {
+                state.mapZoom += GetMouseWheelMove() * 0.15f;
+                if (state.mapZoom < 0.5f) state.mapZoom = 0.5f;
+                if (state.mapZoom > 5.0f) state.mapZoom = 5.0f;
+            }
+            if (IsMouseButtonDown(MOUSE_RIGHT_BUTTON)) {
+                Vector2 d = GetMouseDelta();
+                state.mapPan.x += d.x;
+                state.mapPan.y += d.y;
+            }
+            DrawRectangleRec(mapArea, { 20, 20, 20, 255 });
 
-            // Polar Projection Map Background
-            Vector2 mapCenter = { 450 + 600 / 2.0f, 20 + 500 / 2.0f };
-            float mapRadius = 230.0f;
+            // === MODE CISEAUX ACTIVE ===
+            BeginScissorMode((int)mapArea.x, (int)mapArea.y, (int)mapArea.width, (int)mapArea.height);
+
+            Vector2 mapCenter = { 450 + 600 / 2.0f + state.mapPan.x, 20 + 500 / 2.0f + state.mapPan.y };
+            float mapRadius = 230.0f * state.mapZoom;
             DrawCircleLines((int)mapCenter.x, (int)mapCenter.y, mapRadius, { 135, 206, 235, 100 });
             DrawText("N", (int)mapCenter.x - 4, (int)(mapCenter.y - mapRadius - 15), 15, ACCENT);
             DrawText("S", (int)mapCenter.x - 4, (int)(mapCenter.y + mapRadius + 5), 15, ACCENT);
             DrawText("E", (int)(mapCenter.x + mapRadius + 5), (int)mapCenter.y - 8, 15, ACCENT);
             DrawText("W", (int)(mapCenter.x - mapRadius - 20), (int)mapCenter.y - 8, 15, ACCENT);
 
-            // Draw Planets ALWAYS (if loaded)
             {
                 std::lock_guard<std::mutex> lock(dataMutex);
                 for (auto& p : state.planets) {
@@ -335,8 +332,8 @@ int main() {
                     }
                 }
             }
+            EndScissorMode();
 
-            // Interaction: Map Click (Only if not fetching)
             if (!state.isFetching && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                 Vector2 mouse = GetMousePosition();
                 std::lock_guard<std::mutex> lock(dataMutex);
@@ -349,19 +346,15 @@ int main() {
                 }
             }
 
-            // --- SMOOTH LOADING SCREEN OVERLAY ---
             if (state.isFetching) {
-                DrawRectangleRec({ 375, 20, 740, 500 }, Fade(BLACK, 0.8f)); // Darkens the map
-
+                DrawRectangleRec({ 375, 20, 740, 500 }, Fade(BLACK, 0.8f));
                 int dotCount = (int)(GetTime() * 3.0) % 4;
                 std::string loadingStr = "FETCHING LIVE NASA DATA";
                 for (int i = 0; i < dotCount; i++) loadingStr += ".";
-
                 int textW = MeasureText(loadingStr.c_str(), 20);
                 DrawText(loadingStr.c_str(), 450 + (600 - textW) / 2, 260, 20, ACCENT);
             }
-
-            DrawRectangleLinesEx({ 375, 20, 740, 500 }, 2, ACCENT); // Outer border
+            DrawRectangleLinesEx({ 375, 20, 740, 500 }, 2, ACCENT);
 
             // Target Selector Panel
             GuiGroupBox(Rectangle{ 60, 100, 220, 420 }, "SELECT TARGET");
@@ -380,18 +373,16 @@ int main() {
                 btnY += 40;
             }
 
-            // Time Controls
             if (GuiButton(Rectangle{ 340, 530, 100, 30 }, "- 1 HOUR")) { state.timeOffsetSeconds -= 3600; state.isFetching = true; state.forceRefresh = true; }
             if (GuiButton(Rectangle{ 450, 530, 100, 30 }, "+ 1 HOUR")) { state.timeOffsetSeconds += 3600; state.isFetching = true; state.forceRefresh = true; }
             if (GuiButton(Rectangle{ 560, 530, 100, 30 }, "RESET NOW")) { state.timeOffsetSeconds = 0; state.isFetching = true; state.forceRefresh = true; }
 
-            // Planet Data Panel
+            // Planet Data Panel (TFOV Intégré)
             GuiGroupBox(Rectangle{ 340, 580, 840, 200 }, "LIVE EPHEMERIS");
             std::lock_guard<std::mutex> lock(dataMutex);
             for (const auto& p : state.planets) {
                 if (p.selected) {
                     DrawText(TextFormat("Target: %s", p.name.c_str()), 360, 600, 20, ACCENT);
-
                     if (state.isFetching) {
                         DrawText("Calculating Trajectories...", 360, 630, 20, LIGHTGRAY);
                     }
@@ -401,6 +392,29 @@ int main() {
                             DrawText(TextFormat("Altitude: %.2f deg", p.coords.alt), 360, 660, 20, WHITE);
                             DrawText(TextFormat("Azimuth: %.2f deg", p.coords.az), 360, 690, 20, WHITE);
                             DrawText(TextFormat("Apparent Size: %.2f arcsec", p.ang_size), 600, 660, 20, WHITE);
+
+                            float tFl = 1000.0f, eFl = 25.0f, afov = 50.0f;
+                            try { tFl = std::stof(state.telBuf); }
+                            catch (...) {}
+                            try { eFl = std::stof(state.eyeBuf); }
+                            catch (...) {}
+                            try { afov = std::stof(state.afovBuf); }
+                            catch (...) {}
+
+                            float mag = tFl / (eFl > 0 ? eFl : 1.0f);
+                            float tfov_deg = afov / mag;
+                            float tfov_arcsec = tfov_deg * 3600.0f;
+
+                            Vector2 eye = { 980, 680 };
+                            DrawCircleLines((int)eye.x, (int)eye.y, 70, ACCENT);
+
+                            float pr = (float)((p.ang_size / tfov_arcsec) * 70.0f);
+                            if (pr < 1.5f) pr = 1.5f;
+                            if (pr > 70.0f) pr = 70.0f;
+
+                            DrawCircleV(eye, pr, GOLD);
+                            DrawText(TextFormat("Mag: %.1fx", mag), 920, 760, 15, ACCENT);
+                            DrawText(TextFormat("TFOV: %.2f deg", tfov_deg), 920, 780, 15, ACCENT);
                         }
                     }
                 }
@@ -408,7 +422,6 @@ int main() {
         }
         else if (state.current_tab == 1) { // SETTINGS
             GuiGroupBox(content, "APPLICATION SETTINGS");
-
             DrawText("OBSERVATION LOCATION", 360, 50, 20, ACCENT);
             DrawLine(360, 75, 1150, 75, ACCENT);
 
@@ -432,41 +445,106 @@ int main() {
             DrawLine(360, 285, 1150, 285, ACCENT);
 
             GuiLabel(Rectangle{ 360, 300, 200, 30 }, "Telescope Focal Length (mm):");
-            if (GuiTextBox(Rectangle{ 560, 300, 150, 30 }, state.telBuf, 32, state.editTel)) {
-                state.editTel = !state.editTel; if (!state.editTel) SaveSpecs();
-            }
+            if (GuiTextBox(Rectangle{ 560, 300, 150, 30 }, state.telBuf, 32, state.editTel)) { state.editTel = !state.editTel; if (!state.editTel) SaveSpecs(); }
 
             GuiLabel(Rectangle{ 360, 340, 200, 30 }, "Eyepiece Focal Length (mm):");
-            if (GuiTextBox(Rectangle{ 560, 340, 150, 30 }, state.eyeBuf, 32, state.editEye)) {
-                state.editEye = !state.editEye; if (!state.editEye) SaveSpecs();
-            }
+            if (GuiTextBox(Rectangle{ 560, 340, 150, 30 }, state.eyeBuf, 32, state.editEye)) { state.editEye = !state.editEye; if (!state.editEye) SaveSpecs(); }
+
+            GuiLabel(Rectangle{ 360, 380, 200, 30 }, "Apparent FOV (deg):");
+            if (GuiTextBox(Rectangle{ 560, 380, 150, 30 }, state.afovBuf, 32, state.editAfov)) { state.editAfov = !state.editAfov; if (!state.editAfov) SaveSpecs(); }
 
             float tFl = 1.0f; float eFl = 1.0f;
             try { if (state.telBuf[0] != '\0') tFl = std::stof(state.telBuf); }
             catch (...) {}
             try { if (state.eyeBuf[0] != '\0') eFl = std::stof(state.eyeBuf); }
             catch (...) {}
-            DrawText(TextFormat("Current Magnification: %.1f x", tFl / eFl), 360, 400, 20, GOLD);
+            DrawText(TextFormat("Current Magnification: %.1f x", tFl / eFl), 360, 440, 20, GOLD);
         }
-        else if (state.current_tab == 2) { // JOURNAL
+        else if (state.current_tab == 2) { // JOURNAL (EDITEUR MULTILIGNE AMÉLIORÉ)
             GuiGroupBox(content, "OBSERVATORY LOGBOOK");
 
-            GuiLabel(Rectangle{ 360, 40, 80, 30 }, "Log Title:");
-            if (GuiTextBox(Rectangle{ 450, 40, 400, 30 }, state.journalTitle, 128, state.editTitle)) state.editTitle = !state.editTitle;
+            // --- BARRE D'OUTILS ---
+            DrawText("Formatting Tools:", 360, 40, 15, ACCENT);
+            if (GuiButton(Rectangle{ 500, 35, 30, 25 }, "B")) {
+                std::string temp = state.journalBuffer;
+                if (temp.length() < 4000) { temp += "**gras**"; strcpy(state.journalBuffer, temp.c_str()); }
+            }
+            if (GuiButton(Rectangle{ 540, 35, 30, 25 }, "I")) {
+                std::string temp = state.journalBuffer;
+                if (temp.length() < 4000) { temp += "*italique*"; strcpy(state.journalBuffer, temp.c_str()); }
+            }
+            if (GuiButton(Rectangle{ 580, 35, 40, 25 }, "List")) {
+                std::string temp = state.journalBuffer;
+                if (temp.length() < 4000) { temp += "\n- "; strcpy(state.journalBuffer, temp.c_str()); }
+            }
 
-            GuiLabel(Rectangle{ 880, 40, 80, 30 }, "Target:");
-            if (GuiTextBox(Rectangle{ 940, 40, 200, 30 }, state.journalTarget, 64, state.editTarget)) state.editTarget = !state.editTarget;
+            // --- ZONE DE TEXTE MULTILIGNE ET COULEURS PERSONNALISÉES ---
+            Rectangle journalRect = { 360, 70, 800, 400 };
+
+            // Gestion du focus (Activation au clic de la souris)
+            if (CheckCollisionPointRec(GetMousePosition(), journalRect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                state.editJournal = true;
+            }
+            else if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                state.editJournal = false;
+            }
+
+            // Capturer les touches claviers natives quand la zone est active
+            if (state.editJournal) {
+                // Saisie des caractères standards
+                int key = GetCharPressed();
+                while (key > 0) {
+                    size_t len = strlen(state.journalBuffer);
+                    if (len < 4090) {
+                        state.journalBuffer[len] = (char)key;
+                        state.journalBuffer[len + 1] = '\0';
+                    }
+                    key = GetCharPressed();
+                }
+
+                // Touche RETOUR ARRIÈRE (gère les caractères et les lignes)
+                if (IsKeyPressed(KEY_BACKSPACE)) {
+                    size_t len = strlen(state.journalBuffer);
+                    if (len > 0) state.journalBuffer[len - 1] = '\0';
+                }
+
+                // Touche ENTRÉE (Vrai retour à la ligne !)
+                if (IsKeyPressed(KEY_ENTER)) {
+                    size_t len = strlen(state.journalBuffer);
+                    if (len < 4090) {
+                        state.journalBuffer[len] = '\n';
+                        state.journalBuffer[len + 1] = '\0';
+                    }
+                }
+            }
+
+            // Dessin du fond en GRIS FONCÉ
+            DrawRectangleRec(journalRect, state.editJournal ? Color{ 55, 55, 55, 255 } : Color{ 40, 40, 40, 255 });
+            DrawRectangleLinesEx(journalRect, 1, state.editJournal ? WHITE : ACCENT);
+
+            // Création de la chaîne d'affichage avec curseur clignotant
+            std::string displayText = state.journalBuffer;
+            if (state.editJournal && ((int)(GetTime() * 2) % 2 == 0)) displayText += "|";
+
+            // Dessin du TEXTE EN BLANC (Supporte nativement les sauts de ligne \n)
+            DrawTextEx(GetFontDefault(), displayText.c_str(), Vector2{ 375, 85 }, 16, 2, WHITE);
+
+            DrawLine(360, 490, 1150, 490, ACCENT);
+
+            // --- MÉTADONNÉES ---
+            GuiLabel(Rectangle{ 360, 510, 80, 30 }, "Log Title:");
+            if (GuiTextBox(Rectangle{ 450, 510, 400, 30 }, state.journalTitle, 128, state.editTitle)) state.editTitle = !state.editTitle;
+
+            GuiLabel(Rectangle{ 880, 510, 80, 30 }, "Target:");
+            if (GuiTextBox(Rectangle{ 940, 510, 200, 30 }, state.journalTarget, 64, state.editTarget)) state.editTarget = !state.editTarget;
 
             time_t now = std::time(nullptr);
             char dateStr[64]; std::strftime(dateStr, sizeof(dateStr), "%Y-%m-%d %H:%M Local", std::localtime(&now));
-            DrawText(TextFormat("Date: %s", dateStr), 360, 90, 15, LIGHTGRAY);
-            DrawText(TextFormat("Coordinates: Lat %s, Lon %s", state.latBuf, state.lonBuf), 880, 90, 15, LIGHTGRAY);
-
-            DrawLine(360, 120, 1150, 120, ACCENT);
-            if (GuiTextBox(Rectangle{ 360, 140, 800, 560 }, state.journalBuffer, 4096, state.editJournal)) state.editJournal = !state.editJournal;
+            DrawText(TextFormat("Date: %s", dateStr), 360, 560, 15, LIGHTGRAY);
+            DrawText(TextFormat("Coordinates: Lat %s, Lon %s", state.latBuf, state.lonBuf), 880, 560, 15, LIGHTGRAY);
 
             if (GuiButton(Rectangle{ 360, 720, 150, 30 }, "SAVE ENTRY TO LOG")) ExportJournal();
-            DrawText("Entries are appended to 'Observation_Log.txt'", 530, 725, 15, GRAY);
+            DrawText("Entries are appended to 'Observation_Log.txt' with Markdown tags.", 530, 725, 15, GRAY);
         }
 
         EndDrawing();
