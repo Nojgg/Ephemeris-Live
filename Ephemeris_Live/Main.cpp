@@ -19,7 +19,7 @@
 #include <sstream>
 
 const Color MODE_JOUR_BG = { 30, 30, 30, 255 };
-const Color MODE_JOUR_ACCENT = { 135, 206, 235, 255 }; // Sky Blue
+const Color MODE_JOUR_ACCENT = { 135, 206, 235, 255 }; 
 const Color MODE_NUIT_BG = { 12, 0, 0, 255 };
 const Color MODE_NUIT_ACCENT = { 220, 0, 0, 255 };
 
@@ -127,7 +127,7 @@ private:
             return;
         }
 
-        std::getline(file, line); // skip header
+        std::getline(file, line); 
 
         while (std::getline(file, line))
         {
@@ -168,8 +168,8 @@ private:
         {
             c = std::tolower(c);
 
-            // accents supprimés via règles simples ASCII fallback
-            if (c >= 192) continue; // supprime UTF-8 high bytes (crude mais efficace)
+            
+            if (c >= 192) continue; 
 
             if (c == ' ' || c == '-' || c == '\'' || c == '.')
                 continue;
@@ -179,8 +179,6 @@ private:
 
         return out;
     }
-
-
 
     void PerformGeocodeLookup() {
         std::string search = Normalize(textBufferCitySearch);
@@ -203,16 +201,96 @@ private:
         }
     }
 
-    void SyncInterfaceStyles() {
-        Color currentBg = isNightVisionActive ? MODE_NUIT_BG : MODE_JOUR_BG;
-        Color currentAccent = isNightVisionActive ? MODE_NUIT_ACCENT : MODE_JOUR_ACCENT;
-        Color currentText = isNightVisionActive ? Color{ 230, 0, 0, 255 } : WHITE;
+    void SyncInterfaceStyles()
+    {
+        if (isNightVisionActive)
+        {
+            // ===== NIGHT MODE =====
 
-        GuiSetStyle(DEFAULT, BACKGROUND_COLOR, ColorToInt(currentBg));
-        GuiSetStyle(DEFAULT, TEXT_COLOR_NORMAL, ColorToInt(currentText));
-        GuiSetStyle(DEFAULT, BORDER_COLOR_NORMAL, ColorToInt(currentAccent));
-        GuiSetStyle(DEFAULT, LINE_COLOR, ColorToInt(currentAccent));
-        GuiSetStyle(BUTTON, BASE_COLOR_NORMAL, ColorToInt(isNightVisionActive ? Color{ 35, 0, 0, 255 } : Color{ 45, 45, 45, 255 }));
+            GuiSetStyle(DEFAULT, BACKGROUND_COLOR,
+                ColorToInt(Color{ 10, 0, 0, 255 }));
+
+            GuiSetStyle(DEFAULT, BORDER_COLOR_NORMAL,
+                ColorToInt(Color{ 255, 0, 0, 255 }));
+
+            GuiSetStyle(DEFAULT, LINE_COLOR,
+                ColorToInt(Color{ 255, 0, 0, 255 }));
+
+            GuiSetStyle(DEFAULT, TEXT_COLOR_NORMAL,
+                ColorToInt(Color{ 255, 0, 0, 255 }));
+
+
+            // Boutons
+            GuiSetStyle(BUTTON, BASE_COLOR_NORMAL,
+                ColorToInt(Color{ 60, 0, 0, 255 }));
+
+            GuiSetStyle(BUTTON, BASE_COLOR_FOCUSED,
+                ColorToInt(Color{ 90, 0, 0, 255 }));
+
+            GuiSetStyle(BUTTON, BASE_COLOR_PRESSED,
+                ColorToInt(Color{ 120, 0, 0, 255 }));
+
+            GuiSetStyle(BUTTON, TEXT_COLOR_NORMAL,
+                ColorToInt(RED));
+
+
+            // Toggles (liste des objets)
+            GuiSetStyle(TOGGLE, BASE_COLOR_NORMAL,
+                ColorToInt(Color{ 50, 0, 0, 255 }));
+
+            GuiSetStyle(TOGGLE, BASE_COLOR_FOCUSED,
+                ColorToInt(Color{ 80, 0, 0, 255 }));
+
+            GuiSetStyle(TOGGLE, BASE_COLOR_PRESSED,
+                ColorToInt(Color{ 120, 0, 0, 255 }));
+
+            GuiSetStyle(TOGGLE, TEXT_COLOR_NORMAL,
+                ColorToInt(RED));
+        }
+        else
+        {
+            // ===== DAY MODE =====
+
+            GuiSetStyle(DEFAULT, BACKGROUND_COLOR,
+                ColorToInt(Color{ 30, 35, 45, 255 }));
+
+            GuiSetStyle(DEFAULT, BORDER_COLOR_NORMAL,
+                ColorToInt(Color{ 100, 170, 255, 255 }));
+
+            GuiSetStyle(DEFAULT, LINE_COLOR,
+                ColorToInt(Color{ 100, 170, 255, 255 }));
+
+            GuiSetStyle(DEFAULT, TEXT_COLOR_NORMAL,
+                ColorToInt(WHITE));
+
+
+            // Boutons
+            GuiSetStyle(BUTTON, BASE_COLOR_NORMAL,
+                ColorToInt(Color{ 70, 75, 85, 255 }));
+
+            GuiSetStyle(BUTTON, BASE_COLOR_FOCUSED,
+                ColorToInt(Color{ 100, 110, 130, 255 }));
+
+            GuiSetStyle(BUTTON, BASE_COLOR_PRESSED,
+                ColorToInt(Color{ 50, 55, 65, 255 }));
+
+            GuiSetStyle(BUTTON, TEXT_COLOR_NORMAL,
+                ColorToInt(WHITE));
+
+
+            // Toggles
+            GuiSetStyle(TOGGLE, BASE_COLOR_NORMAL,
+                ColorToInt(Color{ 60, 65, 75, 255 }));
+
+            GuiSetStyle(TOGGLE, BASE_COLOR_FOCUSED,
+                ColorToInt(Color{ 90, 100, 120, 255 }));
+
+            GuiSetStyle(TOGGLE, BASE_COLOR_PRESSED,
+                ColorToInt(Color{ 50, 55, 65, 255 }));
+
+            GuiSetStyle(TOGGLE, TEXT_COLOR_NORMAL,
+                ColorToInt(WHITE));
+        }
     }
 
     void ProcessInputs() {
@@ -401,14 +479,12 @@ private:
             }
         }
 
-        // --- DESSIN GÉOMÉTRIQUE DE LA PLANISPHERE AVEC FILTRAGE DE L'HORIZON ---
         BeginScissorMode((int)mapViewport.x, (int)mapViewport.y, (int)mapViewport.width, (int)mapViewport.height);
 
         Vector2 horizonCenter = { mapViewport.x + mapViewport.width / 2.0f + viewPan.x,
                                   mapViewport.y + mapViewport.height / 2.0f + viewPan.y };
         float calculatedRadius = 220.0f * viewZoom;
 
-        // Tracé de l'horizon physique circulaire de l'observateur au sol (Altitude = 0)
         DrawCircleLines((int)horizonCenter.x, (int)horizonCenter.y, calculatedRadius, Fade(themeColor, 0.3f));
 
         if (mapShowCardinals) {
@@ -424,7 +500,6 @@ private:
         CelestialObject* selection = catalog.GetSelectedObject();
         float minimumDistancePixels = 20.0f;
 
-        // Rendu des Constellations (Uniquement au-dessus de l'horizon physique)
         if (mapShowConstellations && mapShowStars) {
             for (auto& ast : catalog.GetAsterisms()) {
                 CelestialObject* s1 = nullptr;
@@ -439,7 +514,7 @@ private:
             }
         }
 
-        // Rendu de la Ligne de Prédiction (Trajectoire de 24h basée sur l'horloge UTC corrigée)
+
         if (mapShowTrajectories && selection) {
             std::time_t lT = std::time(nullptr);
             std::tm* uTS = std::gmtime(&lT);
@@ -450,7 +525,6 @@ private:
                 float t_lst = AstroMath::GetLocalSiderealTime(baseTrajectoryUTC + h * 3600, hardware.longitude);
                 auto t_coords = AstroMath::EquatorialToHorizontal(selection->ra, selection->dec, hardware.latitude, t_lst);
 
-                // On projette visuellement uniquement si la portion de courbe est visible
                 if (t_coords.alt >= 0.0f) {
                     float lR = ((90.0f - t_coords.alt) / 90.0f) * calculatedRadius;
                     float cT = AstroMath::DegToRad(t_coords.az - 90.0f);
@@ -463,13 +537,13 @@ private:
             }
         }
 
-        // Rendu des Objets Célestes Réels
+
         for (auto& obj : database) {
-            if (!obj.isVisible) continue; // Sécurité : Ignore tout ce qui est caché sous l'horizon physique (Alt < 0)
+            if (!obj.isVisible) continue; 
             if (obj.type == "planet" && !mapShowPlanets) continue;
             if (obj.type == "star" && !mapShowStars) continue;
 
-            // Projection Azimutale Stéréographique standard
+
             float linearRadialFactor = ((90.0f - obj.currentCoords.alt) / 90.0f) * calculatedRadius;
             float computationalTheta = AstroMath::DegToRad(obj.currentCoords.az - 90.0f);
 
@@ -505,7 +579,6 @@ private:
         EndScissorMode();
         DrawRectangleLinesEx(mapViewport, 2, themeColor);
 
-        // --- OCULAIRE ET ÉPHÉMÉRIDES ---
         GuiGroupBox(Rectangle{ 340, 540, 840, 240 }, "EYEPIECE SIMULATION");
 
         GuiCheckBox(Rectangle{ 360, 720, 15, 15 }, "Simulate Atmosphere (Seeing)", &simulateAtmosphere);
