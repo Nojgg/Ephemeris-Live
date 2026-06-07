@@ -1,6 +1,6 @@
 # Ephemeris Live
 
-<img src="https://cdn.discordapp.com/attachments/1416155869686661234/1505585440281989230/icon.png?ex=6a0b2935&is=6a09d7b5&hm=606c12e58ffa1f0025441f1169a52b77770f034c8cd455aa5e3face3c7a1251d&" alt="Icon" width="400" height="400"> 
+<img src="https://64.media.tumblr.com/ffd2448b6d0c62a57ba1e573e2f7ac9f/ba589173de72f0a0-bf/s540x810/8c86460d03e1e44883c68ea8162d479948558e72.pnj" alt="Icon" width="400" height="400"> 
 
 A lightweight, real-time astronomical tracking dashboard. Designed as a responsive "mission control" station for amateur astronomers, visual observers, and DIY telescope builders (specifically optimized for the Hadley 3D-printed telescope).
 
