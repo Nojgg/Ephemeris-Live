@@ -209,6 +209,8 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="AstroMath.hpp" />
+    <ClInclude Include="CoreEngine.hpp" />
     <ClInclude Include="Ephemeris_Live.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="raygui-cpp-main\include\raygui-cpp.h" />
