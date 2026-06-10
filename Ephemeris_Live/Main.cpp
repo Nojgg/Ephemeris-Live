@@ -103,15 +103,53 @@ public:
     }
 
     void Execute() {
+        // Allow the window to be resized by the user
+        SetConfigFlags(FLAG_WINDOW_RESIZABLE);
         InitWindow(1200, 800, "StellarCore Engine Pro v6.5");
+        SetWindowMinSize(600, 400); // Optional: prevent shrinking too small
         SetTargetFPS(60);
         SyncInterfaceStyles();
 
+        // Create a virtual canvas matching your original hardcoded resolution
+        RenderTexture2D target = LoadRenderTexture(1200, 800);
+        SetTextureFilter(target.texture, TEXTURE_FILTER_BILINEAR);
+
         while (!WindowShouldClose()) {
+            // Calculate scale to maintain the 1200x800 aspect ratio
+            float scale = std::min((float)GetScreenWidth() / 1200.0f, (float)GetScreenHeight() / 800.0f);
+
+            // Calculate letterbox offsets (black bars)
+            Vector2 mouseOffset = {
+                (GetScreenWidth() - (1200.0f * scale)) * 0.5f,
+                (GetScreenHeight() - (800.0f * scale)) * 0.5f
+            };
+
+            // Scale the mouse inputs so Raygui and custom UI checks work perfectly
+            SetMouseOffset((int)-mouseOffset.x, (int)-mouseOffset.y);
+            SetMouseScale(1.0f / scale, 1.0f / scale);
+
             ProcessInputs();
             UpdateDataPhysics();
+
+            // Begin final rendering
+            BeginDrawing();
+            ClearBackground(BLACK); // The color of the letterbox bars
+
+            // Draw all your existing app logic to the virtual canvas
+            BeginTextureMode(target);
             RenderGraphicsPipeline();
+            EndTextureMode();
+
+            // Draw the scaled virtual canvas to the actual screen
+            Rectangle sourceRec = { 0.0f, 0.0f, (float)target.texture.width, (float)-target.texture.height }; // Flipped Y
+            Rectangle destRec = { mouseOffset.x, mouseOffset.y, 1200.0f * scale, 800.0f * scale };
+
+            DrawTexturePro(target.texture, sourceRec, destRec, Vector2{ 0, 0 }, 0.0f, WHITE);
+
+            EndDrawing();
         }
+
+        UnloadRenderTexture(target);
         CloseWindow();
     }
 
@@ -393,7 +431,7 @@ private:
         Color backgroundClr = isNightVisionActive ? MODE_NUIT_BG : MODE_JOUR_BG;
         Color themeAccent = isNightVisionActive ? MODE_NUIT_ACCENT : MODE_JOUR_ACCENT;
 
-        BeginDrawing();
+       
         ClearBackground(backgroundClr);
 
         GuiGroupBox(Rectangle{ 20, 20, 300, 760 }, "CONTROL PANEL");
@@ -455,7 +493,6 @@ private:
         GuiToggle(Rectangle{ 40, 735, 260, 35 }, "NIGHT VISION MODE [N]", &isNightVisionActive);
         if (isNightVisionActive != stateBefore) SyncInterfaceStyles();
 
-        EndDrawing();
     }
 
     void RenderSkyMapTab(Color themeColor) {
