@@ -1,10 +1,7 @@
-
-
 #define _CRT_SECURE_NO_WARNINGS
 #include "raylib.h"
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
-
 
 #include <iostream>
 #include <string>
@@ -19,7 +16,6 @@
 #include <fstream>
 #include <atomic>
 #include <chrono>
-
 
 // --- Constants ---
 const float MY_PI = 3.14159265358979323846f;
@@ -63,7 +59,7 @@ struct AppState {
     bool editTel = false, editEye = false;
     bool editTitle = false, editTarget = false, editJournal = false;
 
-    long long timeOffsetSeconds = 0;
+    std::atomic<long long> timeOffsetSeconds{ 0 };
     std::atomic<bool> forceRefresh{ true };
     std::atomic<bool> isFetching{ true };
     std::atomic<bool> isRunning{ true };
@@ -87,7 +83,7 @@ std::mutex dataMutex;
 // --- Utility Functions ---
 std::string urlencode(const std::string& str) {
     std::ostringstream escaped;
-    escaped << std::hex << std::uppercase << std::setfill('0'); // FIXED: setfill ensures proper %09 vs %9
+    escaped << std::hex << std::uppercase << std::setfill('0');
     for (char c : str) {
         if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') escaped << c;
         else escaped << '%' << std::setw(2) << int((unsigned char)c);
@@ -95,7 +91,6 @@ std::string urlencode(const std::string& str) {
     return escaped.str();
 }
 
-// FIXED: Now properly injects your actual Latitude and Longitude into the API call
 std::string build_url(const std::string& command, const std::string& start, const std::string& stop, float lat, float lon) {
     std::string site = std::to_string(lon) + "," + std::to_string(lat) + ",0";
     return "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND='" + urlencode(command) +
@@ -121,17 +116,18 @@ float refraction(float alt_deg) {
     float r = 1.02f / tan(degToRad(alt_deg + 10.3f / (alt_deg + 5.11f)));
     return alt_deg + r / 60.0f;
 }
-float lst_deg(float timeUTC) {
+
+float lst_deg(float timeUTC, float longitude) {
     float jd = 2440587.5f + timeUTC / 86400.0f;
     float T = (jd - 2451545.0f) / 36525.0f;
     float gst = 280.46061837f + 360.98564736629f * (jd - 2451545.0f) + T * T * (0.000387933f - T / 38710000.0f);
-    return fmod(gst, 360.0f) + state.longitude;
+    return fmod(gst, 360.0f) + longitude;
 }
 
-HorizonCoords GetAltAz(float raDeg, float decDeg, float timeUTC) {
+HorizonCoords GetAltAz(float raDeg, float decDeg, float timeUTC, float latitude, float longitude) {
     float ra = degToRad(raDeg), dec = degToRad(decDeg);
-    float latRad = degToRad(state.latitude);
-    float lst = degToRad(lst_deg(timeUTC));
+    float latRad = degToRad(latitude);
+    float lst = degToRad(lst_deg(timeUTC, longitude));
     float ha = lst - ra;
     float sin_alt = sin(dec) * sin(latRad) + cos(dec) * cos(latRad) * cos(ha);
     float alt = RadtoDeg(asin(fmaxf(-1.0f, fminf(1.0f, sin_alt))));
@@ -179,8 +175,8 @@ void GeocodeAddress(const std::string& address) {
         std::string lonStr = json.substr(lonPos, json.find("\"", lonPos) - lonPos);
 
         std::lock_guard<std::mutex> lock(dataMutex);
-        strcpy(state.latBuf, latStr.c_str());
-        strcpy(state.lonBuf, lonStr.c_str());
+        snprintf(state.latBuf, sizeof(state.latBuf), "%s", latStr.c_str());
+        snprintf(state.lonBuf, sizeof(state.lonBuf), "%s", lonStr.c_str());
 
         try {
             state.latitude = std::stof(latStr);
@@ -192,7 +188,7 @@ void GeocodeAddress(const std::string& address) {
         catch (...) {}
     }
     else {
-        std::cout << "Geocode Failed! Please check your spelling or internet connection.\n";
+        std::cout << "Geocode Failed! Please check spelling or connection.\n";
     }
 }
 
@@ -203,8 +199,15 @@ void BackendThreadFunc() {
             state.forceRefresh = false;
             state.isFetching = true;
 
-            // Start loading screen timer
             auto fetchStart = std::chrono::steady_clock::now();
+
+            // Thread-safe local snapshots of coordinates
+            float currentLat, currentLon;
+            {
+                std::lock_guard<std::mutex> lock(dataMutex);
+                currentLat = state.latitude;
+                currentLon = state.longitude;
+            }
 
             time_t targetTime = std::time(nullptr) + state.timeOffsetSeconds;
             char start[30], stop[30];
@@ -215,13 +218,13 @@ void BackendThreadFunc() {
             for (auto& p : state.planets) {
                 if (!state.isRunning || state.forceRefresh) break;
 
-                std::string url = build_url(p.id, start, stop, state.latitude, state.longitude);
+                std::string url = build_url(p.id, start, stop, currentLat, currentLon);
                 std::string rawData = exec(("curl -s -L \"" + url + "\"").c_str());
 
                 double ra, dec, ang;
                 if (parse_horizons(rawData, ra, dec, ang)) {
                     std::lock_guard<std::mutex> lock(dataMutex);
-                    p.coords = GetAltAz((float)ra, (float)dec, (float)targetTime);
+                    p.coords = GetAltAz((float)ra, (float)dec, (float)targetTime, currentLat, currentLon);
                     p.ang_size = ang;
                     p.dataLoaded = true;
                 }
@@ -232,7 +235,6 @@ void BackendThreadFunc() {
                 }
             }
 
-            // Ensure the loading screen is visible for at least 800ms so it doesn't flash violently
             auto fetchEnd = std::chrono::steady_clock::now();
             long long duration = std::chrono::duration_cast<std::chrono::milliseconds>(fetchEnd - fetchStart).count();
             if (duration < 800) std::this_thread::sleep_for(std::chrono::milliseconds(800 - duration));
@@ -284,10 +286,16 @@ void ApplyStyle() {
 
 // --- Main Application ---
 int main() {
-
     InitWindow(1200, 800, "Ephemeris Live 3.0");
     SetTargetFPS(60);
-	SetWindowIcon(LoadImage("favicon.png"));
+
+    // Fixed leak: properly unload window icon image resource
+    Image icon = LoadImage("favicon.png");
+    if (icon.data != nullptr) {
+        SetWindowIcon(icon);
+        UnloadImage(icon);
+    }
+
     ApplyStyle();
     LoadSpecs();
 
@@ -344,14 +352,14 @@ int main() {
                     if (p.isVisible && p.dataLoaded && CheckCollisionPointCircle(mouse, p.ui_pos, 15)) {
                         for (auto& other : state.planets) other.selected = false;
                         p.selected = true;
-                        strcpy(state.journalTarget, p.name.c_str());
+                        snprintf(state.journalTarget, sizeof(state.journalTarget), "%s", p.name.c_str());
                     }
                 }
             }
 
             // --- SMOOTH LOADING SCREEN OVERLAY ---
             if (state.isFetching) {
-                DrawRectangleRec({ 375, 20, 740, 500 }, Fade(BLACK, 0.8f)); // Darkens the map
+                DrawRectangleRec({ 375, 20, 740, 500 }, Fade(BLACK, 0.8f));
 
                 int dotCount = (int)(GetTime() * 3.0) % 4;
                 std::string loadingStr = "FETCHING LIVE NASA DATA";
@@ -361,21 +369,33 @@ int main() {
                 DrawText(loadingStr.c_str(), 450 + (600 - textW) / 2, 260, 20, ACCENT);
             }
 
-            DrawRectangleLinesEx({ 375, 20, 740, 500 }, 2, ACCENT); // Outer border
+            DrawRectangleLinesEx({ 375, 20, 740, 500 }, 2, ACCENT);
 
-            // Target Selector Panel
+            // Target Selector Panel (Protected with Mutex Read Checks)
             GuiGroupBox(Rectangle{ 60, 100, 220, 420 }, "SELECT TARGET");
             int btnY = 130;
-            for (auto& p : state.planets) {
-                bool isTarget = p.selected;
-                DrawCircle(75, btnY + 15, 5, p.isVisible && p.dataLoaded ? GREEN : RED);
-                GuiToggle(Rectangle{ 90, (float)btnY, 160, 30 }, p.name.c_str(), &isTarget);
+            for (size_t i = 0; i < state.planets.size(); ++i) {
+                bool isTarget;
+                bool isPlanetVisible;
+                bool isPlanetLoaded;
+                std::string pName;
 
-                if (isTarget != p.selected) {
+                {
+                    std::lock_guard<std::mutex> lock(dataMutex);
+                    isTarget = state.planets[i].selected;
+                    isPlanetVisible = state.planets[i].isVisible;
+                    isPlanetLoaded = state.planets[i].dataLoaded;
+                    pName = state.planets[i].name;
+                }
+
+                DrawCircle(75, btnY + 15, 5, isPlanetVisible && isPlanetLoaded ? GREEN : RED);
+                GuiToggle(Rectangle{ 90, (float)btnY, 160, 30 }, pName.c_str(), &isTarget);
+
+                if (isTarget != state.planets[i].selected) {
                     std::lock_guard<std::mutex> lock(dataMutex);
                     for (auto& other : state.planets) other.selected = false;
-                    p.selected = true;
-                    strcpy(state.journalTarget, p.name.c_str());
+                    state.planets[i].selected = true;
+                    snprintf(state.journalTarget, sizeof(state.journalTarget), "%s", state.planets[i].name.c_str());
                 }
                 btnY += 40;
             }
@@ -387,20 +407,22 @@ int main() {
 
             // Planet Data Panel
             GuiGroupBox(Rectangle{ 340, 580, 840, 200 }, "LIVE EPHEMERIS");
-            std::lock_guard<std::mutex> lock(dataMutex);
-            for (const auto& p : state.planets) {
-                if (p.selected) {
-                    DrawText(TextFormat("Target: %s", p.name.c_str()), 360, 600, 20, ACCENT);
+            {
+                std::lock_guard<std::mutex> lock(dataMutex);
+                for (const auto& p : state.planets) {
+                    if (p.selected) {
+                        DrawText(TextFormat("Target: %s", p.name.c_str()), 360, 600, 20, ACCENT);
 
-                    if (state.isFetching) {
-                        DrawText("Calculating Trajectories...", 360, 630, 20, LIGHTGRAY);
-                    }
-                    else {
-                        DrawText(TextFormat("Status: %s", p.isVisible ? "VISIBLE" : "BELOW HORIZON"), 360, 630, 20, p.isVisible ? GREEN : RED);
-                        if (p.dataLoaded) {
-                            DrawText(TextFormat("Altitude: %.2f deg", p.coords.alt), 360, 660, 20, WHITE);
-                            DrawText(TextFormat("Azimuth: %.2f deg", p.coords.az), 360, 690, 20, WHITE);
-                            DrawText(TextFormat("Apparent Size: %.2f arcsec", p.ang_size), 600, 660, 20, WHITE);
+                        if (state.isFetching) {
+                            DrawText("Calculating Trajectories...", 360, 630, 20, LIGHTGRAY);
+                        }
+                        else {
+                            DrawText(TextFormat("Status: %s", p.isVisible ? "VISIBLE" : "BELOW HORIZON"), 360, 630, 20, p.isVisible ? GREEN : RED);
+                            if (p.dataLoaded) {
+                                DrawText(TextFormat("Altitude: %.2f deg", p.coords.alt), 360, 660, 20, WHITE);
+                                DrawText(TextFormat("Azimuth: %.2f deg", p.coords.az), 360, 690, 20, WHITE);
+                                DrawText(TextFormat("Apparent Size: %.2f arcsec", p.ang_size), 600, 660, 20, WHITE);
+                            }
                         }
                     }
                 }
